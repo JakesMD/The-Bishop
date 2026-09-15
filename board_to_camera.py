@@ -19,7 +19,7 @@ for tag_id, (sign_x, sign_y) in enumerate([(-1, 1), (1, 1), (1, -1), (-1, -1)]):
     ])
 
 
-def get_board_to_camera(frame: np.ndarray) -> np.ndarray | None:
+def get_board_to_camera(frame):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     corners, ids, _ = detector.detectMarkers(gray)
 

@@ -3,7 +3,7 @@ import numpy as np
 from constants import CAMERA_MATRIX, CAMERA_TO_FLANGE
 
 
-def get_pixel_coordinates(frame: np.ndarray, pixel: np.ndarray, flange_to_base: np.ndarray, board_to_camera: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def get_pixel_coordinates(frame, pixel, flange_to_base, board_to_camera):
     board_rotation = board_to_camera[:3, :3]
     board_translation = board_to_camera[:3, 3]
 

@@ -3,7 +3,7 @@ import numpy as np
 from ultralytics.engine.results import Results
 
 
-def get_piece_centroids(frame: np.ndarray, results: Results) -> list[np.ndarray]:
+def get_piece_centroids(frame, results):
     if results.masks is None:
         return []
 
