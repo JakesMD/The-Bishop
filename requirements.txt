@@ -1,0 +1,6 @@
+cairosvg
+chess
+instinct-chess-bot @ git+https://github.com/jakesmd/instinct-chess-bot.git
+numpy>=2.0.0
+opencv-python
+ultralytics

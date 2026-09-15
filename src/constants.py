@@ -1,8 +1,15 @@
+import chess
 import numpy as np
+
+PIECE_IDS = {
+    0: chess.Piece(chess.PAWN, chess.BLACK)
+}
 
 TAG_SIZE = 12.0
 
 TAG_SPACING = 143.5
+
+SQUARE_SIZE = 16
 
 DIST_COEFFICIENTS = np.array([
     0.06262159019574783,

@@ -5,7 +5,7 @@ model = YOLO("yolo26n-seg.pt")
 model.train(
     data="dataset/data.yml",
     epochs=50,
-    imgsz=640,
+    imgsz=720,
     batch=8,
     device="mps",
 
