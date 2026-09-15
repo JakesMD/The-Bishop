@@ -1,0 +1,10 @@
+__pycache__/
+dataset/
+env/
+*.pt
+*.png
+*.jpg
+*.csv
+*.yaml
+
+!runs/segment/train/weights/best.pt
