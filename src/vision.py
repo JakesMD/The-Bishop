@@ -10,6 +10,8 @@ class Vision:
     def __init__(self):
         self.model = YOLO("yolo/runs/segment/train/weights/best.pt")
         self.capture = cv2.VideoCapture(0)
+        self.capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
         self.tag_detector = cv2.aruco.ArucoDetector(
             cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_APRILTAG_16h5),
             cv2.aruco.DetectorParameters()
@@ -28,19 +30,21 @@ class Vision:
             ]))
 
     def detect_state(self, board, flange_to_base):
+        self.capture.grab()
         successful, frame = self.capture.read()
         if not successful:
             raise Exception("Couldn't capture image")
 
+        frame = cv2.rotate(frame, cv2.ROTATE_180)
         results = self.model(frame, conf=0.5, verbose=False)
-        plotted_frame = results[0].plot(font_size=8, line_width=1)
+        frame = results[0].plot(font_size=8, line_width=1)
 
-        board_to_camera = self._get_board_to_camera(plotted_frame)
+        board_to_camera = self._get_board_to_camera(frame)
 
         board = board.copy()
         board.clear_board()
         piece_positions = {}
-        for piece_type, centroids in self._get_piece_centroids(plotted_frame, results[0]).items():
+        for piece_type, centroids in self._get_piece_centroids(frame, results[0]).items():
             for centroid in centroids:
                 if board_to_camera is not None:
                     base_point, board_point = self._get_pixel_coordinates(centroid, flange_to_base, board_to_camera)
@@ -48,7 +52,7 @@ class Vision:
                     if square:
                         board.set_piece_at(square, piece_type)
 
-        return DetectedState(frame=plotted_frame, board=board)
+        return DetectedState(frame=frame, board=board)
 
     def _get_piece_centroids(self, frame, results):
         if results.masks is None:
