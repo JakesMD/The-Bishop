@@ -1,61 +1,138 @@
 import chess
 import numpy as np
-from src.bot import Bot
-from src.canvas import Canvas
-from src.robot import Robot
-from src.vision import Vision
+from src.robot import *
+from src.chess_bot import *
+from src.canvas import *
+from src.motion_planner import *
+from src.vision import *
+from src.types import *
+from src.board import *
+
+chess_bot = ChessBot()
+canvas = Canvas()
+robot = Robot()
+planner = MotionPlanner(robot)
+vision = Vision()
 
 
-def is_game_over(board):
-    return board.is_game_over() or board.can_claim_draw()
+def set_viewing_pose():
+    while True:
+        planner.set_viewing_pose()
+        state = vision.detect_state(chess.Board())
 
-def is_move_legal(board_before, board_after):
-    for move in board_before.legal_moves:
-        board_before.push(move)
-        matches = board_before.board_fen() == board_after.board_fen()
-        board_before.pop()
-        if matches:
-            return True
-    return False
+        if state.board is not None:
+            return state
+
+        canvas.set_text("Line up the board",
+                        "Move the arm or the playing surface until all four corner tags are in shot.")
+        canvas.set_frame(state.frame)
+        canvas.wait_for_space_press("look again")
+
+def get_state(old_board, is_setup=False):
+    while True:
+        planner.look_at_board()
+        state = vision.detect_state(old_board)
+
+        if state.board is None:
+            canvas.set_text("The board isn't visible",
+                            "Put the playing surface back fully below the camera.")
+            canvas.set_frame(state.frame)
+            canvas.wait_for_space_press("look again")
+        elif not is_setup and not is_move_legal(old_board, state.board):
+            canvas.set_text("That isn't a legal move",
+                            "Put the pieces back the way they were and play again.")
+            canvas.set_detected_board(state.board)
+            canvas.set_frame(state.frame)
+            canvas.wait_for_space_press("look again")
+        else:
+            return state
+
+def set_board(state, target_board, title):
+    canvas.set_text(title, "Planning motion...")
+    canvas.set_board(target_board)
+    canvas.set_detected_board(state.board)
+    canvas.set_frame(state.frame)
+    canvas.display()
+
+    while True:
+        transfer = planner.plan_transfer(state, target_board)
+        if transfer is None:
+            return state._replace(board=target_board)
+
+        configurations = planner.make_transfer(state, transfer)
+        try:
+            canvas.set_text(title, "Moving piece...")
+            for configuration in configurations:
+                canvas.set_robot_configuration(configuration, planner.camera_to_base)
+                canvas.display()
+        except (Quit, Reset):
+            for configuration in configurations:
+                pass
+            raise
+
+        state = get_state(state.board, is_setup=True)
+        canvas.set_text(title, "Planning motion...")
+        canvas.set_detected_board(state.board)
+        canvas.set_frame(state.frame)
+        canvas.display()
+
+def get_outcome_message(board: chess.Board):
+    outcome = board.outcome(claim_draw=True)
+
+    if outcome.winner == chess.WHITE:
+        return "The Bishop won"
+    if outcome.winner == chess.BLACK:
+        return "You won"
+
+    return "It's a draw"
+
+
+def take_turns(state):
+    while not is_game_over(state.board):
+        state.board.turn = chess.BLACK
+        canvas.set_text("Your turn", "Make your move on the board.")
+        canvas.set_board(state.board)
+        canvas.set_detected_board(state.board)
+        canvas.set_frame(state.frame)
+        canvas.wait_for_space_press("end turn")
+        state = get_state(state.board)
+
+        state.board.turn = chess.WHITE
+        canvas.set_text("The Bishop's turn", "Thinking...")
+        canvas.set_board(state.board)
+        canvas.set_detected_board(state.board)
+        canvas.set_frame(state.frame)
+        canvas.display()
+        state = set_board(state, chess_bot.play(state.board), "The Bishop's turn")
+
+    canvas.set_text(get_outcome_message(state.board))
+    canvas.set_board(state.board)
+    canvas.set_frame(state.frame)
+    canvas.display()
+    canvas.wait()
 
 
 if __name__ == "__main__":
-    board = chess.Board()
-    board.turn = chess.BLACK
-
-    bot = Bot()
-    canvas = Canvas()
-    robot = Robot()
-    vision = Vision()
-
     try:
-        flange_to_base = robot.move_to_board()
-        state = vision.detect_state(board, flange_to_base)
-        board = state.board
-        canvas.display_board(board, state.frame)
+        state = set_viewing_pose()
+        reset_requested = False
 
-        while True: # not is_game_over(board):
-            # Human (black)
-            while True:
-                canvas.wait_for_space_press()
-                flange_to_base = robot.move_to_board()
-                state = vision.detect_state(board, flange_to_base)
-                if is_move_legal(board, state.board):
-                    break
-                canvas.display_board(state.board, state.frame, illegal=True)
-            canvas.display_board(board, state.frame)
+        while True:
+            try:
+                if reset_requested:
+                    reset_requested = False
+                    state = get_state(state.board, is_setup=True)
+                    state = set_board(state, chess.Board(), "Resetting the board")
 
-            # Bot (white)
-            move = bot.get_move(state.board)
-            robot.make_move(state, move)
-            board = state.board
-            board.push(move)
-            canvas.display_board(board, state.frame)
+                take_turns(state)
+            except Reset:
+                reset_requested = True
 
-        canvas.wait_for_q_press()
+    except Quit:
+        pass
 
     finally:
         canvas.quit()
         vision.quit()
-        bot.quit()
+        chess_bot.quit()
         robot.quit()

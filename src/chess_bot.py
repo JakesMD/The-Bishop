@@ -1,12 +1,14 @@
 import chess.engine
 
-class Bot:
+class ChessBot:
     def __init__(self):
         self.engine = chess.engine.SimpleEngine.popen_uci("instinct-chess-bot")
 
-    def get_move(self, board):
+    def play(self, board):
         result = self.engine.play(board, chess.engine.Limit(time=1))
-        return result.move
+        board = board.copy()
+        board.push(result.move)
+        return board
 
     def quit(self):
         self.engine.quit()

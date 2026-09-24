@@ -1,19 +1,28 @@
+import time
+
 import numpy as np
+from src.constants import *
+
 
 class Robot:
     def __init__(self):
-        pass
+        self.pose = np.eye(4)
+        self.is_gripper_closed = False
 
-    def move_to_board(self):
-        return np.array([
-            [-0.5685,   0.82168,   -0.04076,  -365.341],
-            [0.82176,   0.56951,    0.0192,     95.315],
-            [0.03899,  -0.02257,   -0.99898,   509.752],
-            [0,         0,          0,           1    ],
-        ])
+    def get_pose(self):
+        return self.pose.copy()
 
-    def make_move(self, state, move):
-        pass
+    def move_to(self, pose):
+        self.pose = pose.copy()
+        time.sleep(1.5)
+
+    def close_gripper(self):
+        self.is_gripper_closed = True
+        time.sleep(0.5)
+
+    def open_gripper(self):
+        self.is_gripper_closed = False
+        time.sleep(0.5)
 
     def quit(self):
         pass

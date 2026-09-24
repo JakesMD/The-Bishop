@@ -1,11 +1,10 @@
 __pycache__/
 dataset/
 venv/
+.DS_Store
 *.pdf
 *.png
 *.pt
 *.jpg
 *.csv
 *.yaml
-
-!yolo/runs/segment/train/weights/best.pt
