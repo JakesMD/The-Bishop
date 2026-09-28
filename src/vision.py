@@ -9,8 +9,10 @@ from src.transforms import *
 
 class Vision:
     def __init__(self):
-        self.capture = cv2.VideoCapture(CAMERA_INDEX, cv2.CAP_AVFOUNDATION)
+        self.capture = cv2.VideoCapture(CAMERA_INDEX)
         self.capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
         detector_parameters = cv2.aruco.DetectorParameters()
         detector_parameters.detectInvertedMarker = True
@@ -25,7 +27,6 @@ class Vision:
         if not successful:
             raise RuntimeError("Couldn't capture image")
  
-     #   frame = cv2.rotate(frame, cv2.ROTATE_180)
         tags = self._detect_tags(frame)
         surface_to_camera = self._get_surface_to_camera(tags)
 
@@ -79,7 +80,7 @@ class Vision:
 
     def _draw_piece_center(self, frame, surface_to_camera, pose):
         center_pixel = camera_to_pixel(surface_to_camera @ pose)
-        tip_pixel = camera_to_pixel(surface_to_camera @ move_along_axis(pose, 0, 16))
+        tip_pixel = camera_to_pixel(surface_to_camera @ move_along_axis(pose, 1, 16))
 
         cv2.circle(frame, center_pixel, 5, (0, 0, 255), -1)
         cv2.arrowedLine(frame, center_pixel, tip_pixel, (0, 0, 255), 2, tipLength=0.3)
@@ -91,7 +92,10 @@ class Vision:
 
         heading = end - start
 
-        return roll_pitch_yaw_to_pose(centre, yaw=np.arctan2(heading[1], heading[0]))
+        yaw = np.arctan2(heading[1], heading[0])
+        yaw = (yaw + np.pi / 4) % (np.pi / 2) - np.pi / 4
+
+        return roll_pitch_yaw_to_pose(centre, yaw=yaw)
 
     def _get_parking_spot(self, frame, pieces, surface_to_camera):
         half_board = 4 * SQUARE_SIZE

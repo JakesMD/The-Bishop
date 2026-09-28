@@ -1,5 +1,9 @@
+--extra-index-url https://timschneider42.github.io/franky/whl/libfranka-0.12.1/
+
 cairosvg
 chess
+franky-control
 instinct-chess-bot @ git+https://github.com/jakesmd/instinct-chess-bot.git
 numpy>=2.0.0
 opencv-python
+scipy

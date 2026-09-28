@@ -2,7 +2,7 @@ import chess.engine
 
 class ChessBot:
     def __init__(self):
-        self.engine = chess.engine.SimpleEngine.popen_uci("instinct-chess-bot")
+        self.engine = chess.engine.SimpleEngine.popen_uci("instinct-chess-bot", timeout=120)
 
     def play(self, board):
         result = self.engine.play(board, chess.engine.Limit(time=1))

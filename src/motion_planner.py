@@ -1,3 +1,4 @@
+import os
 import chess
 import numpy as np
 from src.constants import *
@@ -14,8 +15,17 @@ class MotionPlanner:
         self.configuration = None
 
     def set_viewing_pose(self):
-        self.viewing_pose = fix_rotation_error(self.robot.get_pose())
+        self.viewing_pose = self.robot.get_pose()
         self.camera_to_base = self.viewing_pose @ CAMERA_TO_FLANGE
+
+    def has_saved_viewing_pose(self):
+        return os.path.exists("viewing_pose.npy")
+
+    def save_viewing_pose(self):
+        np.save("viewing_pose.npy", self.viewing_pose)
+
+    def move_to_saved_viewing_pose(self):
+        self.robot.move_to(np.load("viewing_pose.npy"))
 
     def look_at_board(self):
         self.robot.move_to(self.viewing_pose)
@@ -63,13 +73,6 @@ class MotionPlanner:
         ]
 
         candidates = [piece for piece in movable if piece.type == wanted[square]]
-
-        if not candidates:
-            wanted_types = set(wanted.values())
-            candidates = [
-                piece for piece in movable
-                if piece.square is not None and piece.type not in wanted_types
-            ]
 
         if not candidates:
             return None

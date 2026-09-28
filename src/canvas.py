@@ -4,42 +4,40 @@ import chess.svg
 import cairosvg
 from src.constants import *
 from src.transforms import *
+from src.types import *
 
 
 class Quit(Exception):
     pass
 
-class Reset(Exception):
-    pass
-
+_quit_cmd = Command("q", "quit")
 
 class Canvas:
     def __init__(self):
         self._width = 1920
-        self._header_height = 480
-        self._body_height = 1080
+        self._panel_height = 480
+        self._camera_height = 1080
         self._margin = 40
 
-        self._message_scale = 0.9
+        self._font_scale = 0.9
         self._line_height = 50
-        self._board_size = self._header_height - self._line_height
+        self._board_size = self._panel_height - self._line_height
 
         self.window_name = "The Bishop"
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(self.window_name, self._width, self._header_height + self._body_height)
+        cv2.resizeWindow(self.window_name, self._width, self._panel_height + self._camera_height)
 
         self.board_image = None
         self.detected_image = None
         self.frame = None
         self.robot_configuration = None
         self.camera_to_base = None
-        self.title = ""
-        self.message = ""
+        self.text = ""
         self.commands = []
+        self._last_key = -1
 
-    def set_text(self, title, message=""):
-        self.title = title
-        self.message = message
+    def set_text(self, text):
+        self.text = text
 
     def set_board(self, board):
         self.board_image = self._draw_board(board)
@@ -55,43 +53,45 @@ class Canvas:
         self.robot_configuration = robot_configuration
         self.camera_to_base = camera_to_base
 
-    def display(self):
-        body = self.frame if self.frame is not None else np.zeros((self._body_height, self._width, 3), np.uint8)
+    def set_commands(self, commands=()):
+        self.commands = list(commands)
+
+    def draw(self):
+        camera_view = self.frame if self.frame is not None else np.zeros((self._camera_height, self._width, 3), np.uint8)
 
         if self.robot_configuration is not None:
-            body = self._draw_end_effector(body.copy(), self.robot_configuration, np.linalg.inv(self.camera_to_base))
+            camera_view = self._draw_end_effector(camera_view.copy(), self.robot_configuration, np.linalg.inv(self.camera_to_base))
 
-        height, width, _ = body.shape
-        body = cv2.resize(body, (self._width, int(height * self._width / width)))
+     #   camera_view = cv2.rotate(camera_view, cv2.ROTATE_180)
+        height, width, _ = camera_view.shape
+        camera_view = cv2.resize(camera_view, (self._width, int(height * self._width / width)))
 
-        cv2.imshow(self.window_name, np.vstack((self._draw_header(), body)))
-        self._read_key()
+        cv2.imshow(self.window_name, np.vstack((self._draw_panel(), camera_view)))
 
-    def wait_for_space_press(self, space="continue"):
-        self.commands = [("SPACE", space)]
-        self.display()
-
-        while self._read_key() != ord(" "):
-            pass
-
-        self.commands = []
-
-    def wait(self):
-       while True:
-            self._read_key()
-
-    def _read_key(self):
-        key = cv2.waitKey(1) & 0xFF
-
-        if key == ord("q"):
+        self._last_key = cv2.waitKey(1) & 0xFF
+        if self._last_key == ord(_quit_cmd.key):
             raise Quit()
-        if key == ord("r"):
-            raise Reset()
 
-        return key
+    def read_command(self):
+        return self._consume(self._last_key)
 
-    def _draw_header(self):
-        header = np.zeros((self._header_height, self._width, 3), np.uint8)
+    def wait_for_command(self):
+        while True:
+            command = self._consume(cv2.waitKey(0) & 0xFF)
+            if command is not None:
+                return command
+
+    def _consume(self, key):
+        if key == ord(_quit_cmd.key):
+            raise Quit()
+
+        for command in self.commands:
+            if key == ord(command.key):
+                self.commands = []
+                return command
+
+    def _draw_panel(self):
+        panel = np.zeros((self._panel_height, self._width, 3), np.uint8)
 
         right = self._width
         for image, caption in [(self.detected_image, "Detected"), (self.board_image, "Expected")]:
@@ -99,38 +99,34 @@ class Canvas:
                 continue
 
             right -= self._board_size
-            header[self._line_height:, right:right + self._board_size] = image
-            self._draw_caption(header, caption, right)
+            panel[self._line_height:, right:right + self._board_size] = image
+            self._draw_caption(panel, caption, right)
 
         y = self._margin + self._line_height
-        cv2.putText(header, self.title, (self._margin, y), cv2.FONT_HERSHEY_SIMPLEX, 1.8, (255, 255, 255), 3)
+        cv2.putText(panel, self.text, (self._margin, y), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
 
-        if self.message:
-            y += self._line_height // 2 + self._line_height
-            cv2.putText(header, self.message, (self._margin, y), cv2.FONT_HERSHEY_SIMPLEX, self._message_scale, (180, 180, 180), 2)
-
-        commands = self.commands + [("R", "reset"), ("Q", "quit")]
+        commands = [*self.commands, _quit_cmd]
         key_width = max(
-            cv2.getTextSize(key, cv2.FONT_HERSHEY_SIMPLEX, self._message_scale, 2)[0][0]
-            for key, _ in commands
+            cv2.getTextSize(command.label, cv2.FONT_HERSHEY_SIMPLEX, self._font_scale, 2)[0][0]
+            for command in commands
         )
 
         y += self._line_height // 2
-        for key, description in commands:
+        for command in commands:
             y += self._line_height
-            cv2.putText(header, key, (self._margin, y), cv2.FONT_HERSHEY_SIMPLEX, self._message_scale, (110, 110, 110), 2)
+            cv2.putText(panel, command.label, (self._margin, y), cv2.FONT_HERSHEY_SIMPLEX, self._font_scale, (110, 110, 110), 2)
             cv2.putText(
-                header, description,
+                panel, command.description,
                 (self._margin + key_width + self._margin, y),
-                cv2.FONT_HERSHEY_SIMPLEX, self._message_scale, (110, 110, 110), 2,
+                cv2.FONT_HERSHEY_SIMPLEX, self._font_scale, (110, 110, 110), 2,
             )
 
-        return header
+        return panel
 
-    def _draw_caption(self, header, caption, left):
-        text_width = cv2.getTextSize(caption, cv2.FONT_HERSHEY_SIMPLEX, self._message_scale, 2)[0][0]
+    def _draw_caption(self, panel, caption, left):
+        text_width = cv2.getTextSize(caption, cv2.FONT_HERSHEY_SIMPLEX, self._font_scale, 2)[0][0]
         origin = (left + (self._board_size - text_width) // 2, self._line_height - self._margin // 4)
-        cv2.putText(header, caption, origin, cv2.FONT_HERSHEY_SIMPLEX, self._message_scale, (180, 180, 180), 2)
+        cv2.putText(panel, caption, origin, cv2.FONT_HERSHEY_SIMPLEX, self._font_scale, (180, 180, 180), 2)
 
     def _draw_board(self, board: chess.Board):
         check_square = board.king(board.turn) if board.is_check() else None

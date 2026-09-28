@@ -14,19 +14,39 @@ robot = Robot()
 planner = MotionPlanner(robot)
 vision = Vision()
 
+result_cmd = Command("r", "reset")
+continue_cmd = Command(" ", "continue")
+go_to_saved_cmd = Command("g", "go to saved position")
+end_turn_cmd = Command(" ", "end turn")
+look_again = Command(" ", "look again")
+
 
 def set_viewing_pose():
     while True:
-        planner.set_viewing_pose()
         state = vision.detect_state(chess.Board())
+        board_visible = state.board is not None
+        has_saved_pose = planner.has_saved_viewing_pose()
 
-        if state.board is not None:
-            return state
+        commands = []
+        if board_visible:
+            commands.append(continue_cmd)
+        if has_saved_pose:
+            commands.append(go_to_saved_cmd)
 
-        canvas.set_text("Line up the board",
-                        "Move the arm or the playing surface until all four corner tags are in shot.")
+        canvas.set_text("Line up the board")
         canvas.set_frame(state.frame)
-        canvas.wait_for_space_press("look again")
+        canvas.set_commands(commands)
+        canvas.draw()
+        command = canvas.read_command()
+
+        if command == go_to_saved_cmd:
+            canvas.set_text("Moving to saved position...")
+            canvas.draw()
+            planner.move_to_saved_viewing_pose()
+        elif command == continue_cmd:
+            planner.set_viewing_pose()
+            planner.save_viewing_pose()
+            return state
 
 def get_state(old_board, is_setup=False):
     while True:
@@ -34,47 +54,40 @@ def get_state(old_board, is_setup=False):
         state = vision.detect_state(old_board)
 
         if state.board is None:
-            canvas.set_text("The board isn't visible",
-                            "Put the playing surface back fully below the camera.")
-            canvas.set_frame(state.frame)
-            canvas.wait_for_space_press("look again")
+            set_viewing_pose()
         elif not is_setup and not is_move_legal(old_board, state.board):
-            canvas.set_text("That isn't a legal move",
-                            "Put the pieces back the way they were and play again.")
+            canvas.set_text("Illegal move")
             canvas.set_detected_board(state.board)
             canvas.set_frame(state.frame)
-            canvas.wait_for_space_press("look again")
+            canvas.set_commands([look_again, result_cmd])
+            canvas.draw()
+            if canvas.wait_for_command() == result_cmd:
+                return None
         else:
             return state
 
 def set_board(state, target_board, title):
-    canvas.set_text(title, "Planning motion...")
+    canvas.set_text(f"{title} - planning")
     canvas.set_board(target_board)
     canvas.set_detected_board(state.board)
     canvas.set_frame(state.frame)
-    canvas.display()
+    canvas.draw()
 
     while True:
         transfer = planner.plan_transfer(state, target_board)
         if transfer is None:
             return state._replace(board=target_board)
 
-        configurations = planner.make_transfer(state, transfer)
-        try:
-            canvas.set_text(title, "Moving piece...")
-            for configuration in configurations:
-                canvas.set_robot_configuration(configuration, planner.camera_to_base)
-                canvas.display()
-        except (Quit, Reset):
-            for configuration in configurations:
-                pass
-            raise
+        canvas.set_text(f"{title} - moving")
+        for configuration in planner.make_transfer(state, transfer):
+            canvas.set_robot_configuration(configuration, planner.camera_to_base)
+            canvas.draw()
 
         state = get_state(state.board, is_setup=True)
-        canvas.set_text(title, "Planning motion...")
+        canvas.set_text(f"{title} - planning")
         canvas.set_detected_board(state.board)
         canvas.set_frame(state.frame)
-        canvas.display()
+        canvas.draw()
 
 def get_outcome_message(board: chess.Board):
     outcome = board.outcome(claim_draw=True)
@@ -90,43 +103,45 @@ def get_outcome_message(board: chess.Board):
 def take_turns(state):
     while not is_game_over(state.board):
         state.board.turn = chess.BLACK
-        canvas.set_text("Your turn", "Make your move on the board.")
+        canvas.set_text("Your turn")
         canvas.set_board(state.board)
         canvas.set_detected_board(state.board)
         canvas.set_frame(state.frame)
-        canvas.wait_for_space_press("end turn")
+        canvas.set_commands([end_turn_cmd, result_cmd])
+        canvas.draw()
+        command = canvas.wait_for_command()
+        if command == result_cmd:
+            return
+
         state = get_state(state.board)
+        if state is None:
+            return
 
         state.board.turn = chess.WHITE
-        canvas.set_text("The Bishop's turn", "Thinking...")
+        canvas.set_text("The Bishop's turn - thinking")
         canvas.set_board(state.board)
         canvas.set_detected_board(state.board)
         canvas.set_frame(state.frame)
-        canvas.display()
+        canvas.draw()
+
         state = set_board(state, chess_bot.play(state.board), "The Bishop's turn")
 
     canvas.set_text(get_outcome_message(state.board))
     canvas.set_board(state.board)
     canvas.set_frame(state.frame)
-    canvas.display()
-    canvas.wait()
+    canvas.set_commands([result_cmd])
+    canvas.draw()
+    canvas.wait_for_command()
 
 
 if __name__ == "__main__":
     try:
         state = set_viewing_pose()
-        reset_requested = False
 
         while True:
-            try:
-                if reset_requested:
-                    reset_requested = False
-                    state = get_state(state.board, is_setup=True)
-                    state = set_board(state, chess.Board(), "Resetting the board")
-
-                take_turns(state)
-            except Reset:
-                reset_requested = True
+            take_turns(state)
+            state = get_state(chess.Board(), is_setup=True)
+            state = set_board(state, chess.Board(), "Resetting the board")
 
     except Quit:
         pass

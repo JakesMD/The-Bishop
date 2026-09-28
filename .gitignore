@@ -8,3 +8,4 @@ venv/
 *.jpg
 *.csv
 *.yaml
+*.npy

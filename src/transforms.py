@@ -1,11 +1,11 @@
 import chess
-import cv2
 import numpy as np
+from scipy.spatial.transform import Rotation
 from src.constants import *
 
 def fix_rotation_error(pose):
-    in_rotation, _stretch, out_rotation = np.linalg.svd(pose[:3, :3])
-    return make_pose(in_rotation @ out_rotation, pose[:3, 3])
+    rotation = Rotation.from_matrix(pose[:3, :3]).as_matrix()
+    return make_pose(rotation, pose[:3, 3])
 
 
 def make_pose(rotation, position):
@@ -16,32 +16,12 @@ def make_pose(rotation, position):
 
 
 def rotation_vector_to_pose(rotation_vector, position):
-    rotation, _ = cv2.Rodrigues(rotation_vector)
-    return make_pose(rotation, position)
+    return make_pose(Rotation.from_rotvec(rotation_vector).as_matrix(), position)
 
 
 def roll_pitch_yaw_to_pose(position, roll=0.0, pitch=0.0, yaw=0.0):
-    cos_roll, sin_roll = np.cos(roll), np.sin(roll)
-    cos_pitch, sin_pitch = np.cos(pitch), np.sin(pitch)
-    cos_yaw, sin_yaw = np.cos(yaw), np.sin(yaw)
-
-    a = np.array([
-        [1, 0,         0        ],
-        [0, cos_roll, -sin_roll ],
-        [0, sin_roll,  cos_roll ],
-    ])
-    b = np.array([
-        [ cos_pitch, 0, sin_pitch],
-        [ 0,         1, 0        ],
-        [-sin_pitch, 0, cos_pitch],
-    ])
-    c = np.array([
-        [cos_yaw, -sin_yaw, 0],
-        [sin_yaw,  cos_yaw, 0],
-        [0,        0,       1],
-    ])
-
-    return make_pose(c @ b @ a, position)
+    rotation = Rotation.from_euler("xyz", [roll, pitch, yaw]).as_matrix()
+    return make_pose(rotation, position)
 
 
 def move_along_axis(pose, axis, distance):
