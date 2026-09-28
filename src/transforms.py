@@ -16,7 +16,7 @@ def make_pose(rotation, position):
 
 
 def rotation_vector_to_pose(rotation_vector, position):
-    return make_pose(Rotation.from_rotvec(rotation_vector).as_matrix(), position)
+    return make_pose(Rotation.from_rotvec(np.ravel(rotation_vector)).as_matrix(), position)
 
 
 def roll_pitch_yaw_to_pose(position, roll=0.0, pitch=0.0, yaw=0.0):

@@ -80,7 +80,7 @@ class Vision:
 
     def _draw_piece_center(self, frame, surface_to_camera, pose):
         center_pixel = camera_to_pixel(surface_to_camera @ pose)
-        tip_pixel = camera_to_pixel(surface_to_camera @ move_along_axis(pose, 1, 16))
+        tip_pixel = camera_to_pixel(surface_to_camera @ move_along_axis(pose, 0, 16))
 
         cv2.circle(frame, center_pixel, 5, (0, 0, 255), -1)
         cv2.arrowedLine(frame, center_pixel, tip_pixel, (0, 0, 255), 2, tipLength=0.3)
@@ -93,7 +93,6 @@ class Vision:
         heading = end - start
 
         yaw = np.arctan2(heading[1], heading[0])
-        yaw = (yaw + np.pi / 4) % (np.pi / 2) - np.pi / 4
 
         return roll_pitch_yaw_to_pose(centre, yaw=yaw)
 
