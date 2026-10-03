@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 from src.types import *
 from src.board import *
-from src.constants import *
+from config import *
 from src.transforms import *
 
 

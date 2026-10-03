@@ -10,15 +10,23 @@ from src.board import *
 
 chess_bot = ChessBot()
 canvas = Canvas()
-robot = Robot()
-planner = MotionPlanner(robot)
-vision = Vision()
 
 result_cmd = Command("r", "reset")
 continue_cmd = Command(" ", "continue")
 go_to_saved_cmd = Command("g", "go to saved position")
 end_turn_cmd = Command(" ", "end turn")
 look_again = Command(" ", "look again")
+retry_cmd = Command(" ", "retry")
+
+def wait_for_retry(error):
+    canvas.set_text(f"Error moving to pose: {error}")
+    canvas.set_commands([retry_cmd])
+    canvas.draw()
+    canvas.wait_for_command()
+
+robot = Robot(wait_for_retry)
+planner = MotionPlanner(robot)
+vision = Vision()
 
 
 def set_viewing_pose():
@@ -55,6 +63,11 @@ def get_state(old_board, is_setup=False):
 
         if state.board is None:
             set_viewing_pose()
+        elif len(state.pieces) != TOTAL_PIECES:
+            canvas.set_text(f"Only {len(state.pieces)}/{TOTAL_PIECES} pieces visible")
+            canvas.set_frame(state.frame)
+            canvas.set_commands([])
+            canvas.draw()
         elif not is_setup and not is_move_legal(old_board, state.board):
             canvas.set_text("Illegal move")
             canvas.set_detected_board(state.board)
@@ -137,6 +150,7 @@ def take_turns(state):
 if __name__ == "__main__":
     try:
         state = set_viewing_pose()
+        state = get_state(chess.Board(), is_setup=True)
 
         while True:
             take_turns(state)

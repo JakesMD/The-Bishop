@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import chess.svg
 import cairosvg
-from src.constants import *
+from config import *
 from src.transforms import *
 from src.types import *
 

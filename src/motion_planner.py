@@ -1,7 +1,7 @@
 import os
 import chess
 import numpy as np
-from src.constants import *
+from config import *
 from src.board import *
 from src.transforms import *
 from src.types import *

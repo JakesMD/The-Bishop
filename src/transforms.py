@@ -1,7 +1,7 @@
 import chess
 import numpy as np
 from scipy.spatial.transform import Rotation
-from src.constants import *
+from config import *
 
 def fix_rotation_error(pose):
     rotation = Rotation.from_matrix(pose[:3, :3]).as_matrix()
