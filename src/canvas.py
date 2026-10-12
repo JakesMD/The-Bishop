@@ -129,7 +129,11 @@ class Canvas:
         cv2.putText(panel, caption, origin, cv2.FONT_HERSHEY_SIMPLEX, self._font_scale, (180, 180, 180), 2)
 
     def _draw_board(self, board: chess.Board):
-        check_square = board.king(board.turn) if board.is_check() else None
+        check_square = next(
+            (square for colour in (board.turn, not board.turn)
+             if (square := board.king(colour)) is not None and board.is_attacked_by(not colour, square)),
+            None,
+        )
         board_svg = chess.svg.board(board=board, size=self._board_size, flipped=True, check=check_square)
         png_bytes = cairosvg.svg2png(bytestring=board_svg.encode('utf-8'))
         return cv2.imdecode(np.frombuffer(png_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)

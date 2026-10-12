@@ -1,4 +1,3 @@
-import chess
 import numpy as np
 
 CAMERA_INDEX = 0
@@ -32,8 +31,11 @@ SQUARE_SIZE = 34.25
 SURFACE_TAG_SIZE = 13.0
 SURFACE_TAG_SPAN = np.array([592, 235])
 
-PIECE_HEIGHT = 16
+PIECE_HEIGHT = 6
 PIECE_DIAMETER = 30
+
+ICON_CROP_SIZE_PX = 64
+ICON_CROP_MARGIN_RATIO = 1.25
 
 PARKING_BOARD_MARGIN = 20.0
 PARKING_TAG_MARGIN = 2.0
@@ -56,21 +58,6 @@ SURFACE_TAG_POINTS = {
     1: _surface_tag_points([ 1,  1]),
     2: _surface_tag_points([ 1, -1]),
     3: _surface_tag_points([-1, -1]),
-}
-
-PIECE_IDS = {
-    10: chess.Piece(chess.PAWN, chess.WHITE),
-    11: chess.Piece(chess.ROOK, chess.WHITE),
-    12: chess.Piece(chess.KNIGHT, chess.WHITE),
-    13: chess.Piece(chess.BISHOP, chess.WHITE),
-    14: chess.Piece(chess.QUEEN, chess.WHITE),
-    15: chess.Piece(chess.KING, chess.WHITE),
-    20: chess.Piece(chess.PAWN, chess.BLACK),
-    21: chess.Piece(chess.ROOK, chess.BLACK),
-    22: chess.Piece(chess.KNIGHT, chess.BLACK),
-    23: chess.Piece(chess.BISHOP, chess.BLACK),
-    24: chess.Piece(chess.QUEEN, chess.BLACK),
-    25: chess.Piece(chess.KING, chess.BLACK),
 }
 
 TOTAL_PIECES = 34

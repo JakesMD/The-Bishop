@@ -4,8 +4,11 @@ venv/
 .DS_Store
 *.pdf
 *.png
+*.pptx
 *.pt
 *.jpg
 *.csv
 *.yaml
 *.npy
+!yolo/runs/obb/icon/weights/best.pt
+!yolo/runs/classify/train/weights/best.pt

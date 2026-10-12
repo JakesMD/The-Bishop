@@ -3,6 +3,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 from config import *
 from src.transforms import *
+import time
 
 class Robot:
     def __init__(self, wait_for_retry):
@@ -22,6 +23,7 @@ class Robot:
         
 
     def move_to(self, pose):
+        time.sleep(1)
         while True:
             try:
                # raise Exception()
