@@ -116,7 +116,7 @@ class Vision:
         centre_x, centre_y, _, _, rotation = box
         centre = pixel_to_surface(np.array([centre_x, centre_y]), surface_to_camera, PIECE_HEIGHT)
 
-        return roll_pitch_yaw_to_pose(centre, yaw=rotation)
+        return roll_pitch_yaw_to_pose(centre, yaw=-rotation)
 
     def _get_parking_spot(self, frame, pieces, surface_to_camera):
         half_board = 4 * SQUARE_SIZE

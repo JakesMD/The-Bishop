@@ -68,9 +68,11 @@ class Canvas:
 
         cv2.imshow(self.window_name, np.vstack((self._draw_panel(), camera_view)))
 
-        self._last_key = cv2.waitKey(1) & 0xFF
-        if self._last_key == ord(_quit_cmd.key):
-            raise Quit()
+        self._last_key = -1
+        while (key := cv2.waitKey(1) & 0xFF) != 0xFF:
+            if key == ord(_quit_cmd.key):
+                raise Quit()
+            self._last_key = key
 
     def read_command(self):
         return self._consume(self._last_key)
@@ -126,7 +128,7 @@ class Canvas:
     def _draw_caption(self, panel, caption, left):
         text_width = cv2.getTextSize(caption, cv2.FONT_HERSHEY_SIMPLEX, self._font_scale, 2)[0][0]
         origin = (left + (self._board_size - text_width) // 2, self._line_height - self._margin // 4)
-        cv2.putText(panel, caption, origin, cv2.FONT_HERSHEY_SIMPLEX, self._font_scale, (180, 180, 180), 2)
+        cv2.putText(panel, caption, origin, cv2.FONT_HERSHEY_SIMPLEX, self._font_scale, (110, 110, 110), 2)
 
     def _draw_board(self, board: chess.Board):
         check_square = next(
