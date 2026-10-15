@@ -134,6 +134,9 @@ def take_turns(state):
             return
 
         state.board.turn = chess.WHITE
+        if is_game_over(state.board):
+            break
+
         canvas.set_text("The Bishop's turn - thinking")
         canvas.set_board(state.board)
         canvas.set_detected_board(state.board)
