@@ -1,5 +1,6 @@
 from pathlib import Path
 from ultralytics import YOLO
+from device import best_device
 
 YOLO_DIR = Path(__file__).parent
 MODEL_PATH = YOLO_DIR / "yolo26n-obb.pt"
@@ -18,7 +19,7 @@ model.train(
     workers=2,
     cache=True,
     patience=50,
-    device="mps",
+    device=best_device(),
     degrees=180.0,
     scale=0.3,
 )

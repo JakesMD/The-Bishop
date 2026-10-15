@@ -2,6 +2,7 @@ import cv2, json, random, shutil, sys
 import numpy as np
 from pathlib import Path
 from ultralytics import YOLO
+from device import best_device
 
 YOLO_DIR = Path(__file__).parent
 sys.path.insert(0, str(YOLO_DIR.parent))
@@ -80,7 +81,7 @@ if __name__ == "__main__":
         imgsz=ICON_CROP_SIZE_PX,
         batch=64,
         workers=2,
-        device="mps",
+        device=best_device(),
         fliplr=0.0,
         scale=0.15,
         erasing=0.0,

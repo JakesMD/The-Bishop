@@ -1,51 +1,44 @@
-import franky as fk
-import numpy as np
-from scipy.spatial.transform import Rotation
-from config import *
-from src.transforms import *
-import time
+from abc import ABC, abstractmethod
 
-class Robot:
+
+class Robot(ABC):
     def __init__(self, wait_for_retry):
         self._wait_for_retry = wait_for_retry
-  #      self._arm = fk.Robot("172.16.0.2")
-  #      self._gripper = fk.Gripper("172.16.0.2")
-
-  #      self._arm.recover_from_errors()
-  #      self._arm.relative_dynamics_factor = 0.1
-  #      # self._gripper.homing()
 
     def get_pose(self):
-        return np.eye(4)
-        self._arm.recover_from_errors()
-        pose = self._arm.current_cartesian_state.pose.end_effector_pose.matrix
-        return fix_rotation_error(pose * 1000)
-        
+        return self._retry(self._get_pose)
 
     def move_to(self, pose):
-        time.sleep(1)
+        self._retry(self._move_to, pose)
+
+    def close_gripper(self):
+        self._retry(self._close_gripper)
+
+    def open_gripper(self):
+        self._retry(self._open_gripper)
+
+    def quit(self):
+        pass
+
+    def _retry(self, action, *args):
         while True:
             try:
-               # raise Exception()
-                break
-                self._arm.stop()
-                self._arm.recover_from_errors()
-                quat = Rotation.from_matrix(pose[:3, :3]).as_quat()
-                motion = fk.CartesianMotion(fk.Affine(pose[:3, 3] * 0.001, quat), reference_type=fk.ReferenceType.Absolute)
-                self._arm.move(motion)
-                break
+                return action(*args)
             except Exception as e:
                 self._wait_for_retry(e)
 
-    def close_gripper(self):
-        return
-        self._arm.recover_from_errors()
-        self._gripper.grasp(0.015, 0.02, 20.0)
+    @abstractmethod
+    def _get_pose(self):
+        pass
 
-    def open_gripper(self):
-        return
-        self._arm.recover_from_errors()
-        self._gripper.move(0.02, 0.02)
+    @abstractmethod
+    def _move_to(self, pose):
+        pass
 
-    def quit(self):
+    @abstractmethod
+    def _close_gripper(self):
+        pass
+
+    @abstractmethod
+    def _open_gripper(self):
         pass

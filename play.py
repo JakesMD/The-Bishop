@@ -1,6 +1,6 @@
 import chess
 import numpy as np
-from src.robot import *
+from src.franka_emika import *
 from src.chess_bot import *
 from src.canvas import *
 from src.motion_planner import *
@@ -24,7 +24,7 @@ def wait_for_retry(error):
     canvas.draw()
     canvas.wait_for_command()
 
-robot = Robot(wait_for_retry)
+robot = FrankaEmika(wait_for_retry)
 planner = MotionPlanner(robot)
 vision = Vision()
 
