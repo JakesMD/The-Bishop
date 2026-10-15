@@ -1,10 +1,14 @@
-import chess
-import cv2
+
+import chess, cv2, math
 import numpy as np
+from config import *
+from pathlib import Path
 from src.types import *
 from src.board import *
-from config import *
 from src.transforms import *
+from ultralytics import YOLO
+
+RUNS_DIR = Path(__file__).parent.parent / "yolo" / "runs"
 
 
 class Vision:
@@ -21,19 +25,26 @@ class Vision:
             detector_parameters
         )
 
+        self.piece_detector = YOLO(RUNS_DIR / "obb" / "icon" / "weights" / "best.pt")
+        self.piece_classifier = YOLO(RUNS_DIR / "classify" / "train" / "weights" / "best.pt")
+
+    def set_autofocus_locked(self, locked: bool):
+        self.capture.set(cv2.CAP_PROP_AUTOFOCUS, 0 if locked else 1)
+
     def detect_state(self, game_board: chess.Board):
         self.capture.grab()
         successful, frame = self.capture.read()
         if not successful:
             raise RuntimeError("Couldn't capture image")
- 
+
+        clean_frame = frame.copy()
         tags = self._detect_tags(frame)
         surface_to_camera = self._get_surface_to_camera(tags)
 
         if surface_to_camera is None:
             return DetectedState(frame=frame, board=None, pieces=None, parking_spot=None, surface_to_camera=None)
 
-        pieces = self._get_pieces(frame, tags, surface_to_camera)
+        pieces = self._detect_pieces(frame, clean_frame, tags, surface_to_camera)
         parking_spot = self._get_parking_spot(frame, pieces, surface_to_camera)
 
         detected_board = set_board_pieces(game_board, pieces)
@@ -68,33 +79,47 @@ class Vision:
 
         return rotation_vector_to_pose(rotation_vector, translation_vector)
 
-    def _get_pieces(self, frame, tags, surface_to_camera):
+    def _detect_pieces(self, frame, clean_frame, tags, surface_to_camera):
+        tag_centres = [(corners.mean(axis=0), np.linalg.norm(corners[0] - corners[1])) for tag in tags.values() for corners in tag]
+
+        boxes = self.piece_detector.predict(frame, verbose=False)[0].obb.xywhr.cpu().numpy()
+        boxes = [
+            box for box in boxes
+            if not any(math.hypot(box[0] - centre[0], box[1] - centre[1]) < max(box[2], box[3]) / 2 + tag_size / 2 for centre, tag_size in tag_centres)
+        ]
+        if not boxes:
+            return []
+
+        crops = [
+            self._crop_icon(clean_frame, centre_x, centre_y, max(width, height) * ICON_CROP_MARGIN_RATIO, math.degrees(rotation))
+            for centre_x, centre_y, width, height, rotation in boxes
+        ]
+        classifications = self.piece_classifier.predict(crops, verbose=False)
+
         pieces = []
-        for id, piece_type in PIECE_IDS.items():
-            for corners in tags.get(id, []):
-                pose = self._get_piece_pose(corners, surface_to_camera)
-                pieces.append(DetectedPiece(type=piece_type, square=surface_to_square(pose), pose=pose))
-                self._draw_piece_center(frame, surface_to_camera, pose)
+        for classification, box in zip(classifications, boxes):
+            piece_name = classification.names[classification.probs.top1]
+            piece_type = self._parse_piece_name(piece_name)
+            pose = self._get_piece_pose(box, surface_to_camera)
+            pieces.append(DetectedPiece(type=piece_type, square=surface_to_square(pose), pose=pose))
+            self._draw_piece(frame, box, surface_to_camera, pose, piece_type)
 
         return pieces
 
-    def _draw_piece_center(self, frame, surface_to_camera, pose):
-        center_pixel = camera_to_pixel(surface_to_camera @ pose)
-        tip_pixel = camera_to_pixel(surface_to_camera @ move_along_axis(pose, 0, 16))
+    def _crop_icon(self, image, centre_x, centre_y, side_length, angle_degrees):
+        transform = cv2.getRotationMatrix2D((centre_x, centre_y), angle_degrees, ICON_CROP_SIZE_PX / side_length)
+        transform[:, 2] += ICON_CROP_SIZE_PX / 2 - np.array([centre_x, centre_y])
+        return cv2.warpAffine(image, transform, (ICON_CROP_SIZE_PX, ICON_CROP_SIZE_PX), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
 
-        cv2.circle(frame, center_pixel, 5, (0, 0, 255), -1)
-        cv2.arrowedLine(frame, center_pixel, tip_pixel, (0, 0, 255), 2, tipLength=0.3)
+    def _parse_piece_name(self, name):
+        colour, piece_name = name.split("_")
+        return chess.Piece(chess.PIECE_NAMES.index(piece_name), colour == "white")
 
-    def _get_piece_pose(self, corners, surface_to_camera):
-        centre = pixel_to_surface(corners.mean(axis=0), surface_to_camera, PIECE_HEIGHT)
-        start = pixel_to_surface(corners[0], surface_to_camera, PIECE_HEIGHT)
-        end = pixel_to_surface(corners[1], surface_to_camera, PIECE_HEIGHT)
+    def _get_piece_pose(self, box, surface_to_camera):
+        centre_x, centre_y, _, _, rotation = box
+        centre = pixel_to_surface(np.array([centre_x, centre_y]), surface_to_camera, PIECE_HEIGHT)
 
-        heading = end - start
-
-        yaw = np.arctan2(heading[1], heading[0])
-
-        return roll_pitch_yaw_to_pose(centre, yaw=yaw)
+        return roll_pitch_yaw_to_pose(centre, yaw=-rotation)
 
     def _get_parking_spot(self, frame, pieces, surface_to_camera):
         half_board = 4 * SQUARE_SIZE
@@ -118,6 +143,16 @@ class Vision:
                         return make_pose(np.eye(3), [point[0], point[1], 0.0])
 
         return None
+
+    def _draw_piece(self, frame, box, surface_to_camera, pose, piece_type):
+        centre_x, centre_y, width, height, rotation = box
+        corners = cv2.boxPoints(((centre_x, centre_y), (width, height), math.degrees(rotation)))
+        cv2.polylines(frame, [corners.astype(np.int32)], True, (0, 0, 255), 1)
+
+        center_pixel = camera_to_pixel(surface_to_camera @ pose)
+        label = f"{'w' if piece_type.color else 'b'}.{chess.piece_name(piece_type.piece_type)}"
+        cv2.circle(frame, center_pixel, 5, (0, 0, 255), -1)
+        cv2.putText(frame, label, (center_pixel[0] + 8, center_pixel[1] - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1, cv2.LINE_AA)
 
     def _draw_parking_spot(self, frame, surface_to_camera, point):
         angles = np.linspace(0, 2 * np.pi, 16, endpoint=False)

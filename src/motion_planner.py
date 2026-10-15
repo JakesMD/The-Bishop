@@ -56,16 +56,16 @@ class MotionPlanner:
         place_pose = self._get_place_pose(state, transfer.square, reference_yaw)
 
         yield self.robot.open_gripper()
-        yield self._move_to(state, self._approach(pick_pose))
-        yield self._move_to(state, pick_pose)
-        yield self._close_gripper()
+        yield from self._move_to(state, self._approach(pick_pose))
+        yield from self._move_to(state, pick_pose)
+        yield from self._close_gripper()
 
-        yield self._move_to(state, self._approach(pick_pose))
-        yield self._move_to(state, self._approach(place_pose))
-        yield self._move_to(state, place_pose)
-        yield self._open_gripper()
+        yield from self._move_to(state, self._approach(pick_pose))
+        yield from self._move_to(state, self._approach(place_pose))
+        yield from self._move_to(state, place_pose)
+        yield from self._open_gripper()
 
-        yield self._move_to(state, self._approach(place_pose))
+        yield from self._move_to(state, self._approach(place_pose))
 
     def _get_source_piece(self, state, square, surplus, wanted):
         movable = [
@@ -124,16 +124,16 @@ class MotionPlanner:
 
     def _move_to(self, state, pose):
         base_pose = self.camera_to_base @ state.surface_to_camera @ pose
-        self.robot.move_to(base_pose)
         self.configuration = self.configuration._replace(pose=base_pose)
-        return self.configuration
+        yield self.configuration
+        self.robot.move_to(base_pose)
 
     def _close_gripper(self):
-        self.robot.close_gripper()
         self.configuration = self.configuration._replace(is_gripper_closed=True)
-        return self.configuration
+        yield self.configuration
+        self.robot.close_gripper()
 
     def _open_gripper(self):
-        self.robot.open_gripper()
         self.configuration = self.configuration._replace(is_gripper_closed=False)
-        return self.configuration
+        yield self.configuration
+        self.robot.open_gripper()

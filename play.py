@@ -1,6 +1,6 @@
 import chess
 import numpy as np
-from src.robot import *
+from src.franka_emika import *
 from src.chess_bot import *
 from src.canvas import *
 from src.motion_planner import *
@@ -24,12 +24,14 @@ def wait_for_retry(error):
     canvas.draw()
     canvas.wait_for_command()
 
-robot = Robot(wait_for_retry)
+robot = FrankaEmika(wait_for_retry)
 planner = MotionPlanner(robot)
 vision = Vision()
 
 
 def set_viewing_pose():
+    vision.set_autofocus_locked(False)
+
     while True:
         state = vision.detect_state(chess.Board())
         board_visible = state.board is not None
@@ -54,6 +56,7 @@ def set_viewing_pose():
         elif command == continue_cmd:
             planner.set_viewing_pose()
             planner.save_viewing_pose()
+            vision.set_autofocus_locked(True)
             return state
 
 def get_state(old_board, is_setup=False):
@@ -131,6 +134,9 @@ def take_turns(state):
             return
 
         state.board.turn = chess.WHITE
+        if is_game_over(state.board):
+            break
+
         canvas.set_text("The Bishop's turn - thinking")
         canvas.set_board(state.board)
         canvas.set_detected_board(state.board)
