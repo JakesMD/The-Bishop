@@ -1,4 +1,4 @@
-import chess
+import chess, cv2
 import numpy as np
 from scipy.spatial.transform import Rotation
 from config import *
@@ -31,7 +31,8 @@ def move_along_axis(pose, axis, distance):
 
 
 def pixel_to_surface(pixel, surface_to_camera, height=0.0):
-    ray = np.linalg.solve(CAMERA_MATRIX, [pixel[0], pixel[1], 1.0])
+    undistorted = cv2.undistortPoints(np.array([[pixel[:2]]], dtype=np.float64), CAMERA_MATRIX, DIST_COEFFICIENTS)
+    ray = np.append(undistorted.ravel(), 1.0)
     normal = surface_to_camera[:3, 2]
 
     raised_origin = surface_to_camera[:3, 3] + normal * height
@@ -41,9 +42,8 @@ def pixel_to_surface(pixel, surface_to_camera, height=0.0):
 
 
 def camera_to_pixel(pose):
-    pixel = CAMERA_MATRIX @ pose[:3, 3]
-    pixel /= pixel[2]
-    return (int(pixel[0]), int(pixel[1]))
+    pixel, _ = cv2.projectPoints(pose[:3, 3].reshape(1, 3), np.zeros(3), np.zeros(3), CAMERA_MATRIX, DIST_COEFFICIENTS)
+    return tuple(int(value) for value in pixel.ravel())
 
 
 def square_to_surface(square):
