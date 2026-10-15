@@ -30,6 +30,8 @@ vision = Vision()
 
 
 def set_viewing_pose():
+    vision.set_autofocus_locked(False)
+
     while True:
         state = vision.detect_state(chess.Board())
         board_visible = state.board is not None
@@ -54,6 +56,7 @@ def set_viewing_pose():
         elif command == continue_cmd:
             planner.set_viewing_pose()
             planner.save_viewing_pose()
+            vision.set_autofocus_locked(True)
             return state
 
 def get_state(old_board, is_setup=False):

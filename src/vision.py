@@ -28,6 +28,9 @@ class Vision:
         self.piece_detector = YOLO(RUNS_DIR / "obb" / "icon" / "weights" / "best.pt")
         self.piece_classifier = YOLO(RUNS_DIR / "classify" / "train" / "weights" / "best.pt")
 
+    def set_autofocus_locked(self, locked: bool):
+        self.capture.set(cv2.CAP_PROP_AUTOFOCUS, 0 if locked else 1)
+
     def detect_state(self, game_board: chess.Board):
         self.capture.grab()
         successful, frame = self.capture.read()
