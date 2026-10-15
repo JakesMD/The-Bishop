@@ -1,5 +1,5 @@
 __pycache__/
-dataset/
+**/dataset/*
 venv/
 .DS_Store
 *.pdf
@@ -10,5 +10,7 @@ venv/
 *.csv
 *.yaml
 *.npy
+!assets/*.png
+!yolo/dataset/data.yaml
 !yolo/runs/obb/icon/weights/best.pt
 !yolo/runs/classify/train/weights/best.pt
