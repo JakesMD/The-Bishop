@@ -44,7 +44,7 @@ class Vision:
         if surface_to_camera is None:
             return DetectedState(frame=frame, board=None, pieces=None, parking_spot=None, surface_to_camera=None)
 
-        pieces = self._detect_pieces(frame, clean_frame, tags, surface_to_camera)
+        pieces = self._detect_pieces(frame, clean_frame, surface_to_camera)
         parking_spot = self._get_parking_spot(frame, pieces, surface_to_camera)
 
         detected_board = set_board_pieces(game_board, pieces)
@@ -79,14 +79,10 @@ class Vision:
 
         return rotation_vector_to_pose(rotation_vector, translation_vector)
 
-    def _detect_pieces(self, frame, clean_frame, tags, surface_to_camera):
-        tag_centres = [(corners.mean(axis=0), np.linalg.norm(corners[0] - corners[1])) for tag in tags.values() for corners in tag]
-
+    def _detect_pieces(self, frame, clean_frame, surface_to_camera):
         boxes = self.piece_detector.predict(frame, verbose=False)[0].obb.xywhr.cpu().numpy()
-        boxes = [
-            box for box in boxes
-            if not any(math.hypot(box[0] - centre[0], box[1] - centre[1]) < max(box[2], box[3]) / 2 + tag_size / 2 for centre, tag_size in tag_centres)
-        ]
+        poses = [self._get_piece_pose(box, surface_to_camera) for box in boxes]
+        boxes, poses = self._remove_false_positives(boxes, poses)
         if not boxes:
             return []
 
@@ -97,14 +93,29 @@ class Vision:
         classifications = self.piece_classifier.predict(crops, verbose=False)
 
         pieces = []
-        for classification, box in zip(classifications, boxes):
+        for classification, box, pose in zip(classifications, boxes, poses):
             piece_name = classification.names[classification.probs.top1]
             piece_type = self._parse_piece_name(piece_name)
-            pose = self._get_piece_pose(box, surface_to_camera)
             pieces.append(DetectedPiece(type=piece_type, square=surface_to_square(pose), pose=pose))
             self._draw_piece(frame, box, surface_to_camera, pose, piece_type)
 
         return pieces
+
+    def _remove_false_positives(self, boxes, poses):
+        surface_limit = SURFACE_TAG_SPAN / 2 + SURFACE_TAG_SIZE / 2
+        tag_centres = [points[:, :2].mean(axis=0) for points in SURFACE_TAG_POINTS.values()]
+        tag_clearance = PIECE_DIAMETER / 2 + SURFACE_TAG_SIZE / 2
+
+        kept_boxes, kept_poses = [], []
+        for box, pose in zip(boxes, poses):
+            centre = pose[:2, 3]
+            outside_surface = np.any(np.abs(centre) > surface_limit)
+            on_tag = any(np.linalg.norm(centre - tag_centre) < tag_clearance for tag_centre in tag_centres)
+            if not outside_surface and not on_tag:
+                kept_boxes.append(box)
+                kept_poses.append(pose)
+
+        return kept_boxes, kept_poses
 
     def _crop_icon(self, image, centre_x, centre_y, side_length, angle_degrees):
         transform = cv2.getRotationMatrix2D((centre_x, centre_y), angle_degrees, ICON_CROP_SIZE_PX / side_length)
